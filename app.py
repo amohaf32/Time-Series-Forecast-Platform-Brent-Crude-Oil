@@ -339,7 +339,18 @@ def main():
         # HISTORICAL (PAST 4 WKS) + PROJECTED (NEXT 4 WKS) TRAJECTORY CHART
         # ---------------------------------------------------------------------
         st.markdown('<div class="section-header">📈 Past 4-Week Actual & Projected 4-Week Price Trajectory</div>', unsafe_allow_html=True)
-        st.caption("Seamless 8-week continuous timeline combining historical spot performance with champion model 4-week projected path.")
+        st.caption(
+            "Seamless 8-week continuous timeline combining historical spot performance with champion model 4-week projected path.",
+            help=(
+                "ℹ️ **Timeline Price Definition**:\n\n"
+                "The price shown at each point on this 8-week timeline is the **actual or predicted Friday closing price** (sampled at weekly Friday close intervals).\n\n"
+                "• **📍 Spot Baseline (t₀)**: Actual Friday closing price of the current week.\n\n"
+                "• **🔹 Week 1 Point (t+1)**: The AI model's predicted Friday closing price 1 week out.\n\n"
+                "• **🔹 Week 2 Point (t+2)**: The AI model's predicted Friday closing price 2 weeks out.\n\n"
+                "• **🔹 Week 3 Point (t+3)**: The AI model's predicted Friday closing price 3 weeks out.\n\n"
+                "• **🔹 Week 4 Point (t+4)**: The AI model's predicted Friday closing price 4 weeks out."
+            )
+        )
         
         # Historical Past 4 Weeks (5 points: t-4, t-3, t-2, t-1, t0)
         hist_5w = df_raw['Brent_Crude'].iloc[-5:]
