@@ -486,22 +486,62 @@ def train_and_evaluate_all(ml_df, train_pct=0.8, lasso_alpha=0.01, rf_estimators
         'champion_col': champion_col
     }
 
-def simulate_scenario(model, base_features_row, usd_change_pct=0.0, vix_change_pct=0.0, opec_change_pct=0.0):
+def simulate_scenario(model, base_features_row, usd_change_pct=0.0, vix_change_pct=0.0, opec_change_pct=0.0, df_engineered=None):
     """
     Simulate what-if macroeconomic shocks on Brent Crude price prediction.
+    Applies exact physical percentage scaling to raw DXY, VIX, and OPEC production indicators
+    before standardizing them to Z-scores.
     """
     features = ['Price_Lag_1', 'Price_Lag_2', 'Price_Lag_3', 'USD_Z', 'VIX_Z', 'OPEC_Z']
     sim_row = base_features_row[features].copy()
     
-    # Apply shock multipliers to normalized Z-scores
-    sim_row['USD_Z'] += (usd_change_pct / 10.0)
-    sim_row['VIX_Z'] += (vix_change_pct / 10.0)
-    sim_row['OPEC_Z'] += (opec_change_pct / 10.0)
+    # Calculate exact raw percentage shocks if raw columns and full dataset statistics are available
+    if df_engineered is not None and 'US_Dollar_Index' in base_features_row and 'VIX_Index' in base_features_row and 'OPEC_Plus_Production' in base_features_row:
+        usd_std = df_engineered['US_Dollar_Index'].std(ddof=0)
+        vix_std = df_engineered['VIX_Index'].std(ddof=0)
+        opec_std = df_engineered['OPEC_Plus_Production'].std(ddof=0)
+        
+        usd_raw = base_features_row['US_Dollar_Index']
+        vix_raw = base_features_row['VIX_Index']
+        opec_raw = base_features_row['OPEC_Plus_Production']
+        
+        usd_z_delta = (usd_raw * (usd_change_pct / 100.0)) / usd_std if usd_std > 0 else 0.0
+        vix_z_delta = (vix_raw * (vix_change_pct / 100.0)) / vix_std if vix_std > 0 else 0.0
+        opec_z_delta = (opec_raw * (opec_change_pct / 100.0)) / opec_std if opec_std > 0 else 0.0
+        
+        sim_row['USD_Z'] += usd_z_delta
+        sim_row['VIX_Z'] += vix_z_delta
+        sim_row['OPEC_Z'] += opec_z_delta
+    else:
+        # Fallback to relative Z-score scaling
+        sim_row['USD_Z'] += (usd_change_pct / 100.0)
+        sim_row['VIX_Z'] += (vix_change_pct / 100.0)
+        sim_row['OPEC_Z'] += (opec_change_pct / 100.0)
     
-    sim_input = pd.DataFrame([sim_row], columns=features)
-    pred_log = model.predict(sim_input)[0]
-    pred_price = np.expm1(pred_log)
+    # Iterative 4-Week Horizon Forecast under Scenario
+    current_lags = [base_features_row['Brent_Log'], base_features_row['Price_Lag_1'], base_features_row['Price_Lag_2']]
+    usd_z = sim_row['USD_Z']
+    vix_z = sim_row['VIX_Z']
+    opec_z = sim_row['OPEC_Z']
     
+    multi_horizon_scenario = []
+    for step in range(4):
+        input_row = pd.DataFrame([{
+            'Price_Lag_1': current_lags[0],
+            'Price_Lag_2': current_lags[1],
+            'Price_Lag_3': current_lags[2],
+            'USD_Z': usd_z,
+            'VIX_Z': vix_z,
+            'OPEC_Z': opec_z
+        }], columns=features)
+        
+        step_pred_log = model.predict(input_row)[0]
+        step_pred_price = float(np.expm1(step_pred_log))
+        multi_horizon_scenario.append(step_pred_price)
+        
+        current_lags = [step_pred_log, current_lags[0], current_lags[1]]
+    
+    pred_price = multi_horizon_scenario[0]
     base_price = base_features_row['Brent_Crude'] if 'Brent_Crude' in base_features_row else base_features_row.iloc[0]
     delta_dollars = pred_price - base_price
     delta_pct = (delta_dollars / base_price) * 100
@@ -510,7 +550,8 @@ def simulate_scenario(model, base_features_row, usd_change_pct=0.0, vix_change_p
         'base_price': base_price,
         'predicted_price': pred_price,
         'delta_dollars': delta_dollars,
-        'delta_pct': delta_pct
+        'delta_pct': delta_pct,
+        'multi_horizon_scenario': multi_horizon_scenario
     }
 
 def validate_on_secondary_dataset(df_modern_eng, df_historical_eng, trained_models=None):
