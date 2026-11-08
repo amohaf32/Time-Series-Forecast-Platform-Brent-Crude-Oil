@@ -17,7 +17,9 @@ warnings.filterwarnings('ignore', category=UserWarning)
 DATA_PROCESSED_DIR = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'data_processed')
 
 def calculate_metrics(y_true, y_pred, model_name, params_str=""):
-    """Calculate MAE, RMSE, R2 Score, MAPE, Directional Accuracy, and Durbin-Watson score."""
+    """
+    Calculate MAE, RMSE, R2 Score, MAPE, Directional Accuracy, and Durbin-Watson score.
+    """
     mae = mean_absolute_error(y_true, y_pred)
     rmse = np.sqrt(mean_squared_error(y_true, y_pred))
     r2 = r2_score(y_true, y_pred)

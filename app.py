@@ -186,9 +186,8 @@ def main():
 
     st.markdown("---")
 
-    # =========================================================================
+    
     # VIEW MODE 1: LAYMAN / QUICK OVERVIEW (NON-PROFESSIONAL AUDIENCE)
-    # =========================================================================
     if audience_mode == layman_label:
         st.markdown('<div class="section-header">🔰 Executive Trade Summary & Market Signal</div>', unsafe_allow_html=True)
         st.caption("Market signals tailored for daily decision-makers and non-technical stakeholders.")
@@ -256,9 +255,8 @@ def main():
         # Plain English Market Explanation
         st.info(f"💡 **Executive Overview**: {risk_summary['summary_text']}")
 
-        # ---------------------------------------------------------------------
+        
         # VERIFIABLE SOURCE CROSS-VERIFICATION & BENCHMARK ALIGNMENT
-        # ---------------------------------------------------------------------
         with st.expander("🔗 **Verifiable Source Cross-Verification & Benchmark Alignment** (Click to inspect official external sources)", expanded=True):
             st.markdown(f"""
             <div style="background-color: #1e293b; border-left: 5px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 12px;">
@@ -335,9 +333,8 @@ def main():
                 w4_delta_str = f"-${abs(tot_pnl):,.2f} ({roi_pct:.1f}%)" if tot_pnl < 0 else f"+${tot_pnl:,.2f} ({roi_pct:+.1f}%)"
                 mc4.metric("Week 4 Forecast", f"${w4_val:,.2f}", w4_delta_str)
 
-        # ---------------------------------------------------------------------
+        
         # HISTORICAL (PAST 4 WKS) + PROJECTED (NEXT 4 WKS) TRAJECTORY CHART
-        # ---------------------------------------------------------------------
         st.markdown('<div class="section-header">📈 Past 4-Week Actual & Projected 4-Week Price Trajectory</div>', unsafe_allow_html=True)
         st.caption(
             "Seamless 8-week continuous timeline combining historical spot performance with champion model 4-week projected path.",
@@ -432,15 +429,13 @@ def main():
         )
         st.plotly_chart(fig_layman, use_container_width=True)
 
-    # =========================================================================
+    
     # VIEW MODE 2: QUANTITATIVE ANALYTICS (PROFESSIONAL AUDIENCE)
-    # =========================================================================
     else:
         st.markdown('<div class="section-header">🔬 Quantitative Analytics & Multi-Model Evaluation</div>', unsafe_allow_html=True)
         
-        # ---------------------------------------------------------------------
+        
         # MODEL EXPLAINABILITY WATERFALL CHART ("Why this price?")
-        # ---------------------------------------------------------------------
         st.markdown('### 🔍 Forecast Attribution Waterfall ("Why This Price?")')
         st.caption(
             "Deconstructs the exact dollar contribution of market drivers shifting the forecast relative to the baseline price.",
@@ -484,9 +479,8 @@ def main():
 
         st.markdown("---")
 
-        # ---------------------------------------------------------------------
+        
         # MULTI-MODEL FORECAST & FAN CHART
-        # ---------------------------------------------------------------------
         st.markdown('### 📈 Multi-Model Price Forecast Comparison')
         
         # Dynamic Year Filter Dropdown (filters available test set years dynamically)
@@ -562,9 +556,8 @@ def main():
 
         st.markdown("---")
 
-        # ---------------------------------------------------------------------
+        
         # PERFORMANCE SCOREBOARD & RISK METRICS
-        # ---------------------------------------------------------------------
         st.markdown('<div class="section-header">📊 Performance Scoreboard & Quantitative Risk Indicators</div>', unsafe_allow_html=True)
         
         # Display Champion Model Active Status Callout
@@ -606,9 +599,8 @@ def main():
             st.metric("1-Week 99% VaR", f"${risk_summary['var_99_dollars']:.2f} / bbl")
             st.metric("1-Month 95% VaR", f"${risk_summary['var_1mo_95_dollars']:.2f} / bbl")
 
-        # ---------------------------------------------------------------------
+        
         # FEATURE IMPORTANCE & RESIDUAL DIAGNOSTICS
-        # ---------------------------------------------------------------------
         col_fi, col_res = st.columns(2)
         with col_fi:
             st.markdown("### 🔍 Tree Model Feature Importance Breakdown")
@@ -654,9 +646,7 @@ def main():
             fig_res.update_layout(height=350, showlegend=False)
             st.plotly_chart(fig_res, use_container_width=True)
 
-        # ---------------------------------------------------------------------
         # ADVANCED ANALYSIS EXPANDERS (PROFESSIONAL MODE EXCLUSIVE)
-        # ---------------------------------------------------------------------
         st.markdown("---")
         # --- Upload Custom Data Section (Commented Out) ---
         # with st.expander("📁 Upload Custom Data & Run Predictions"):

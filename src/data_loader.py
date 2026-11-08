@@ -19,9 +19,15 @@ def pull_market_data(start_date="2016-01-01", end_date=None):
     cleaned_data = weekly_data.ffill().bfill()
     return cleaned_data
 
+def get_eia_api_key():
+    """Return the EIA API key from the EIA_API_KEY environment variable, or None if not set."""
+    return os.environ.get("EIA_API_KEY") or None
+
 def pull_opec_data():
     """Fetch OPEC production data from EIA API or fallback if offline."""
-    eia_api_key = "1aVwQiijaPZ9PJde4Pfuf1AU5UMH9ARVbRlIbmgD"
+    eia_api_key = get_eia_api_key()
+    if not eia_api_key:
+        return None
     series_id = 'COPR_OPECPLUS'
     url = f"https://api.eia.gov/v2/steo/data/?api_key={eia_api_key}&frequency=monthly&data[0]=value&facets[seriesId][]={series_id}"
     
@@ -40,6 +46,42 @@ def pull_opec_data():
     except Exception:
         pass
     return None
+
+def pull_eia_steo_brent_forecast(months_ahead=3):
+    """
+    Fetch the official EIA Short-Term Energy Outlook (STEO) Brent spot price forecast (series BREPUUS).
+    Returns a DataFrame indexed by month (first day) with column 'EIA_STEO_Brent' covering the
+    current and upcoming months, or None if the API key is missing or the request fails.
+    """
+    eia_api_key = get_eia_api_key()
+    if not eia_api_key:
+        return None
+
+    params = {
+        "api_key": eia_api_key,
+        "frequency": "monthly",
+        "data[0]": "value",
+        "facets[seriesId][]": "BREPUUS",
+        "sort[0][column]": "period",
+        "sort[0][direction]": "desc",
+        "length": 24,
+    }
+    try:
+        response = requests.get("https://api.eia.gov/v2/steo/data/", params=params, timeout=8)
+        if response.status_code != 200:
+            return None
+        rows = response.json()['response']['data']
+        steo_df = pd.DataFrame(rows)[['period', 'value']].copy()
+        steo_df['period'] = pd.to_datetime(steo_df['period'] + '-01')
+        steo_df['value'] = steo_df['value'].astype(float)
+        steo_df = steo_df.set_index('period').sort_index()
+        steo_df.columns = ['EIA_STEO_Brent']
+
+        this_month = pd.Timestamp.today().normalize().replace(day=1)
+        upcoming = steo_df[steo_df.index >= this_month].head(months_ahead)
+        return upcoming if not upcoming.empty else None
+    except Exception:
+        return None
 
 def build_master_dataset(start_date="2016-01-01", end_date=None, force_refresh=False):
     """Build master dataset combining financial indicators and OPEC production."""

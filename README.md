@@ -301,5 +301,4 @@ Thanks to my academic and industrial supervisors for their guidance, and to the 
 
 ## License
 
-Released for academic and educational use. Add a `LICENSE` file (for example MIT) to define
-reuse terms before sharing the repository publicly.
+Released for academic and educational use only.
