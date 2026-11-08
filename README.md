@@ -55,8 +55,7 @@ directional accuracy and residual diagnostics. The dashboard then produces a rol
 
 ## Dashboard Preview
 
-> Screenshots live in [`docs/screenshots/`](docs/screenshots/). Save your images there
-> using the file names below and they will render automatically.
+> 🎥 A short screen recording of the dashboard is available in [`docs/screenshots/dashboard_demo.mov`](docs/screenshots/dashboard_demo.mov) (download to play).
 
 ### Quick Overview – live prices, executive trade summary and market signal
 ![Quick Overview](docs/screenshots/01_quick_overview.png)
