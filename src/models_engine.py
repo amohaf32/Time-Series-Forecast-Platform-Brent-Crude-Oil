@@ -175,7 +175,7 @@ def calculate_feature_contributions(model, base_features_row, X_train):
     
     return contrib_df, base_price, pred_price
 
-def calculate_risk_and_signals(df_raw, predictions_df, metrics_df, multi_horizon_preds=None, champion_col=None):
+def calculate_risk_and_signals(df_raw, predictions_df, metrics_df, multi_horizon_preds=None, champion_col=None, eia_steo_df=None):
     """
     Compute Value at Risk (95% & 99% VaR), PnL estimates, holding period horizon,
     and risk-adjusted layman trade signals with directional accuracy guardrails.
@@ -282,50 +282,92 @@ def calculate_risk_and_signals(df_raw, predictions_df, metrics_df, multi_horizon
         risk_level = "LOW RISK 🟢"
         risk_explanation = "Stable market volatility environment."
 
-    # Verifiable Benchmark Cross-Verification (EIA STEO & ICE Futures Market Consensus)
-    eia_steo_brent_avg = latest_price * (1 + (0.012 if delta_pct > 0 else -0.012))
-    eia_trend = "Bullish" if delta_pct > 0 else ("Bearish" if delta_pct < 0 else "Neutral")
+    # Benchmark cross-check against the official EIA Short-Term Energy Outlook (STEO) Brent forecast.
+    # Uses real EIA data when available; otherwise reports that the benchmark is unavailable.
+    eia_available = eia_steo_df is not None and not eia_steo_df.empty
+    eia_value = None
+    eia_month = None
+    eia_delta_pct = None
+    if eia_available:
+        ref_month = (pd.Timestamp(df_raw.index[-1]) + pd.Timedelta(weeks=4)).replace(day=1).normalize()
+        eia_month = ref_month if ref_month in eia_steo_df.index else eia_steo_df.index[0]
+        eia_value = float(eia_steo_df.loc[eia_month, 'EIA_STEO_Brent'])
+        eia_delta_pct = (eia_value - latest_price) / latest_price * 100
     
-    # Calculate Cross-Verification Alignment Score (%)
-    model_dir = 1 if delta_pct > 0 else (-1 if delta_pct < 0 else 0)
-    eia_dir = 1 if eia_trend == "Bullish" else (-1 if eia_trend == "Bearish" else 0)
-    alignment_match = (model_dir == eia_dir)
-    alignment_pct = 92.5 if alignment_match else 65.0
+    # Directional comparison using the same +/-1.5% neutral band as the trade signal
+    def _direction(pct, band=1.5):
+        return 1 if pct >= band else (-1 if pct <= -band else 0)
+
+    model_dir = _direction(delta_pct)
+    eia_dir = _direction(eia_delta_pct) if eia_available else None
     
-    verification_status = "✅ CROSS-VERIFIED (EIA STEO & ICE FUTURES)"
-    verification_badge = "✅ Cross-Verified Source"
+    if not eia_available:
+        verification_state = "unavailable"
+        verification_status = "ℹ️ EIA STEO BENCHMARK UNAVAILABLE"
+        verification_badge = "ℹ️ Benchmark Unavailable"
+        verification_color = "#64748b"
+        alignment_label = "Unavailable"
+        verification_phrase = "not comparable with"
+    elif model_dir == eia_dir:
+        verification_state = "aligned"
+        verification_status = "✅ DIRECTIONALLY CONSISTENT WITH EIA STEO"
+        verification_badge = "✅ Consistent with EIA STEO"
+        verification_color = "#10b981"
+        alignment_label = "Aligned"
+        verification_phrase = "directionally consistent with"
+    elif model_dir == 0 or eia_dir == 0:
+        verification_state = "partial"
+        verification_status = "🟡 PARTIAL ALIGNMENT WITH EIA STEO"
+        verification_badge = "🟡 Partial Alignment"
+        verification_color = "#f59e0b"
+        alignment_label = "Partially aligned (one view is neutral)"
+        verification_phrase = "only partially consistent with"
+    else:
+        verification_state = "diverges"
+        verification_status = "⚠️ DIVERGES FROM EIA STEO"
+        verification_badge = "⚠️ Diverges from EIA STEO"
+        verification_color = "#ef4444"
+        alignment_label = "Diverges"
+        verification_phrase = "directionally different from"
     
     cross_verification_sources = [
         {
             "Source": "U.S. EIA (Energy Information Administration)",
-            "Report": "Short-Term Energy Outlook (STEO)",
-            "Benchmark Forecast": f"${eia_steo_brent_avg:.2f}/bbl ({eia_trend})",
-            "Alignment": f"{alignment_pct}% (High Consensus)",
+            "Report": "Short-Term Energy Outlook (STEO), Brent spot price forecast",
+            "Benchmark Forecast": (
+                f"${eia_value:.2f}/bbl for {eia_month:%b %Y} ({eia_delta_pct:+.1f}% vs. spot)"
+                if eia_available else "Unavailable (offline or EIA_API_KEY not set)"
+            ),
+            "Alignment": alignment_label,
             "URL": "https://www.eia.gov/outlooks/steo/"
         },
         {
-            "Source": "Intercontinental Exchange (ICE)",
-            "Report": "Brent Crude Futures Curve (BZ=F Live)",
-            "Benchmark Forecast": f"${latest_price:.2f}/bbl (Front Month)",
-            "Alignment": "100% Market Match",
-            "URL": "https://www.theice.com/products/219/Brent-Crude-Futures"
-        },
-        {
-            "Source": "OPEC Secretariat",
-            "Report": "Monthly Oil Market Report (MOMR)",
-            "Benchmark Forecast": "41.5 Mbd Production Quotas",
-            "Alignment": "Aligned (Supply Constrained)",
-            "URL": "https://www.opec.org/opec_web/en/publications/338.htm"
+            "Source": "Yahoo Finance (BZ=F)",
+            "Report": "Brent front-month futures price (market reference)",
+            "Benchmark Forecast": f"${latest_price:.2f}/bbl (latest weekly close)",
+            "Alignment": "Market reference, not a forecast",
+            "URL": "https://finance.yahoo.com/quote/BZ%3DF/"
         }
     ]
 
     # Clean escaped formatting string preventing KaTeX inline math bug
+    if eia_available:
+        benchmark_sentence = (
+            f"Cross-check: the official EIA STEO forecasts Brent at \\${eia_value:.2f} for {eia_month:%b %Y} "
+            f"({eia_delta_pct:+.1f}% vs. spot), which is {verification_phrase} this model's 4-week direction."
+        )
+    else:
+        benchmark_sentence = (
+            "The EIA STEO benchmark could not be loaded (offline or EIA_API_KEY not set), "
+            "so no external cross-check is shown."
+        )
+
     summary_text = (
         f"The Champion Model (**{champion_col}**) projects Brent Crude Oil price to move from "
         f"\\${latest_price:.2f} to \\${target_4wk_price:.2f} over the 4-week forecast horizon ({delta_pct:+.2f}%). "
         f"Holding 100 barrels yields an estimated return of \\${pnl_100_barrels:+.2f}. "
         f"Recommended holding horizon is {holding_weeks} week(s) to reach breakeven / target profit. "
-        f"This market signal is **Cross-Verified ({alignment_pct}% consensus alignment)** against official U.S. EIA STEO benchmarks and live ICE Brent futures market curves."
+        f"{benchmark_sentence}"
     )
 
     return {
@@ -347,8 +389,11 @@ def calculate_risk_and_signals(df_raw, predictions_df, metrics_df, multi_horizon
         "summary_text": summary_text,
         "verification_status": verification_status,
         "verification_badge": verification_badge,
-        "alignment_pct": alignment_pct,
-        "eia_steo_brent_avg": round(eia_steo_brent_avg, 2),
+        "verification_state": verification_state,
+        "verification_color": verification_color,
+        "eia_steo_brent": round(eia_value, 2) if eia_available else None,
+        "eia_steo_month": eia_month.strftime("%b %Y") if eia_available else None,
+        "eia_delta_pct": round(eia_delta_pct, 2) if eia_available else None,
         "cross_verification_sources": cross_verification_sources,
         "champion_col": champion_col,
         "risk_reward_ratio": risk_reward_ratio,

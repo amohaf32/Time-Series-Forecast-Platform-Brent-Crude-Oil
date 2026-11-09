@@ -57,17 +57,23 @@ directional accuracy and residual diagnostics. The dashboard then produces a rol
 
 > 🎥 A short screen recording of the dashboard is available in [`docs/screenshots/dashboard_demo.mov`](docs/screenshots/dashboard_demo.mov) (download to play).
 
-### Quick Overview – live prices, executive trade summary and market signal
-![Quick Overview](docs/screenshots/01_quick_overview.png)
+### Quick Overview – live prices, executive trade summary, market signal and EIA STEO benchmark cross-check
+![Quick Overview with EIA STEO benchmark cross-check](docs/screenshots/quick_overview.png)
 
-### Source cross-verification panel & 4-week holding simulator
-![Cross-verification and holding simulator](docs/screenshots/02_cross_verification_simulator.png)
+### 4-week holding simulator and past/projected price trajectory (with 95% forecast range)
+![Holding simulator and price trajectory](docs/screenshots/simulator_trajectory.png)
 
-### Past 4-week actual vs. projected 4-week price trajectory (with 95% forecast range)
-![Price trajectory](docs/screenshots/03_price_trajectory.png)
+### Quantitative Analytics – "Why this price?" forecast attribution waterfall
+![Forecast attribution waterfall](docs/screenshots/attribution_waterfall.png)
 
-### Quantitative Analytics – model performance matrix, VaR, feature importance, residuals
-![Quantitative Analytics](docs/screenshots/04_quantitative_analytics.png)
+### Quantitative Analytics – multi-model comparison and performance matrix
+![Multi-model comparison and performance matrix](docs/screenshots/model_comparison.png)
+
+### Quantitative Analytics – Value at Risk, feature importance and residual distribution
+![Performance matrix, VaR, feature importance and residuals](docs/screenshots/performance_risk.png)
+
+### Macroeconomic what-if stress tester
+![Macroeconomic what-if stress tester](docs/screenshots/stress_tester.png)
 
 ---
 
@@ -111,7 +117,7 @@ The dashboard has two audience profiles, switchable from the sidebar.
 | Source | Series | Notes |
 | :-- | :-- | :-- |
 | Yahoo Finance (`yfinance`) | Brent `BZ=F`, WTI `CL=F`, US Dollar Index `DX-Y.NYB`, VIX `^VIX` | Daily data resampled to **weekly Friday closes** (`W-FRI`) |
-| U.S. EIA API v2 (STEO) | OPEC+ crude production (`COPR_OPECPLUS`) | Monthly, forward-filled to weekly. Falls back to a constant of 41.5 Mbd if the API is unreachable |
+| U.S. EIA API v2 (STEO) | OPEC+ crude production (`COPR_OPECPLUS`); STEO Brent forecast (`BREPUUS`) for the dashboard cross-check | Monthly, forward-filled to weekly. Requires the `EIA_API_KEY` environment variable. OPEC+ falls back to a constant of 41.5 Mbd and the cross-check shows *unavailable* if the API is unreachable |
 
 - **Modern era:** 2016 → present (used for training and evaluation).
 - **Historical regime era:** 2007–2015 (used for out-of-time stress testing; includes the 2008 financial crisis and the 2014 OPEC price war).
@@ -219,6 +225,16 @@ pip install -r requirements.txt
 > pip install tensorflow jupyter
 > ```
 
+### Set your EIA API key
+
+The app reads the key from the `EIA_API_KEY` environment variable (it is no longer stored in the code). Get a free key at <https://www.eia.gov/opendata/>.
+
+```bash
+export EIA_API_KEY="your_key_here"
+```
+
+The app still runs without a key, using cached data and a constant OPEC+ fallback, but the EIA benchmark cross-check will show as unavailable.
+
 ### Run the dashboard
 
 ```bash
@@ -232,13 +248,18 @@ Then open the URL Streamlit prints (usually <http://localhost:8501>).
 ## Using the Dashboard
 
 1. **Pick a view** in the sidebar: *Quick Overview* or *Quantitative Analytics*.
-2. Read the **market signal** and risk level, then expand the **cross-verification** panel for source links.
+2. Read the **market signal** and risk level, then expand the **EIA STEO Benchmark Cross-Check** panel to compare the model with the official EIA outlook and find source links.
 3. Use the **holding simulator** to estimate the value of a position over four weeks.
 4. Switch to **Quantitative Analytics** to inspect the model comparison, VaR, feature importance and residuals.
 5. Open the **Macroeconomic What-If Stress Tester** to shock DXY, VIX or OPEC+ production and see how the forecast responds.
 6. Click **🔄 Refresh Live Market Data** to clear the cache and pull the latest prices.
 
-> **About the cross-verification panel.** The EIA STEO / ICE / OPEC panel is an *illustrative alignment indicator* derived from the model's own forecast direction. It is **not** a live feed of official EIA or ICE forecasts. The links point to the official sources for manual verification.
+> **About the EIA STEO benchmark cross-check.** The panel pulls the official EIA Short-Term Energy Outlook Brent forecast (`BREPUUS`) through the EIA API and compares its *direction* (relative to the latest spot price) with the model's 4-week direction, using a ±1.5% neutral band. The result is shown as *aligned*, *partial*, *diverges* or *unavailable*.
+>
+> - It is a **directional consistency check only**. Agreement does not prove the forecast is accurate.
+> - If `EIA_API_KEY` is not set or the API is unreachable, the panel shows *unavailable* rather than inventing a value.
+> - The Yahoo Finance (`BZ=F`) row is a market price reference only. It is not an ICE feed, and no OPEC quota data is shown.
+> - The ICE and OPEC MOMR links are provided for manual verification.
 
 ---
 
@@ -265,7 +286,7 @@ Suggested reading and running order:
 - **Weekly resolution.** No intraday dynamics, and no explicit modelling of geopolitical events.
 - **Near-coin-flip directional accuracy** for all models.
 - **Crisis degradation.** Performance falls noticeably on the 2007–2015 stress period.
-- **Offline fallbacks.** If the EIA API is unreachable, OPEC+ production defaults to a constant, which weakens that feature.
+- **Offline fallbacks.** If `EIA_API_KEY` is not set or the EIA API is unreachable, OPEC+ production defaults to a constant (which weakens that feature) and the EIA benchmark cross-check shows as *unavailable*.
 
 Proposed future work (from the dissertation): intraday tick-data ingestion, temporal Transformer architectures (Informer, Autoformer, PatchTST), and unstructured alternative data such as LLM news-sentiment scoring and satellite crude-inventory tracking.
 

@@ -8,7 +8,7 @@ import plotly.graph_objects as go
 
 # Add src to module path
 sys.path.append(os.path.join(os.path.dirname(__file__), 'src'))
-from data_loader import build_master_dataset, engineer_features, process_uploaded_file
+from data_loader import build_master_dataset, engineer_features, process_uploaded_file, pull_eia_steo_brent_forecast
 from models_engine import (
     train_and_evaluate_all, 
     calculate_risk_and_signals, 
@@ -114,6 +114,11 @@ def load_all_data(force_refresh=False):
     return df_raw, df_engineered
 
 @st.cache_data(ttl=3600)
+def load_eia_steo_benchmark():
+    """Official EIA STEO Brent forecast used for the benchmark cross-check (None if unavailable)."""
+    return pull_eia_steo_brent_forecast()
+
+@st.cache_data(ttl=3600)
 def run_model_pipeline(_df_engineered):
     return train_and_evaluate_all(
         _df_engineered, 
@@ -159,7 +164,8 @@ def main():
     champion_col = model_results.get('champion_col', 'XGBoost')
     
     # Compute Risk & Signal Analytics
-    risk_summary = calculate_risk_and_signals(df_raw, preds_df, metrics_df, multi_horizon_preds, champion_col=champion_col)
+    eia_steo_df = load_eia_steo_benchmark()
+    risk_summary = calculate_risk_and_signals(df_raw, preds_df, metrics_df, multi_horizon_preds, champion_col=champion_col, eia_steo_df=eia_steo_df)
 
     # Header Box
     st.markdown("""
@@ -257,12 +263,12 @@ def main():
 
         
         # VERIFIABLE SOURCE CROSS-VERIFICATION & BENCHMARK ALIGNMENT
-        with st.expander("🔗 **Verifiable Source Cross-Verification & Benchmark Alignment** (Click to inspect official external sources)", expanded=True):
+        with st.expander("🔗 **EIA STEO Benchmark Cross-Check** (Click to inspect official external sources)", expanded=True):
             st.markdown(f"""
-            <div style="background-color: #1e293b; border-left: 5px solid #10b981; padding: 12px 16px; border-radius: 6px; margin-bottom: 12px;">
-                <span style="color: #10b981; font-weight: 700; font-size: 1.05rem;">{risk_summary['verification_status']}</span>
+            <div style="background-color: #1e293b; border-left: 5px solid {risk_summary['verification_color']}; padding: 12px 16px; border-radius: 6px; margin-bottom: 12px;">
+                <span style="color: {risk_summary['verification_color']}; font-weight: 700; font-size: 1.05rem;">{risk_summary['verification_status']}</span>
                 <span style="color: #94a3b8; font-size: 0.9rem; margin-left: 12px;">
-                    Model signal is verified against official macroeconomic forecasts and live financial exchange settlement curves.
+                    Compares the model's 4-week direction with the official EIA Short-Term Energy Outlook Brent forecast. This is a consistency check, not a validation of accuracy.
                 </span>
             </div>
             """, unsafe_allow_html=True)
@@ -290,7 +296,7 @@ def main():
                 - 🌐 [OPEC Monthly Oil Market Report](https://www.opec.org/opec_web/en/publications/338.htm)
                 - 🌐 [Yahoo Finance Brent (BZ=F)](https://finance.yahoo.com/quote/BZ%3DF/)
                 
-                *Cross-verification confidence is computed by measuring directional alignment between TSFP ML forecast outputs and U.S. EIA Short-Term Energy Outlook consensus projections.*
+                *Alignment compares the direction of the model's 4-week forecast with the direction implied by the EIA STEO Brent forecast (both relative to the latest spot price, using a ±1.5% neutral band). Agreement does not prove either forecast is correct. The Yahoo Finance row is a market price reference, not a forecast.*
                 """)
         st.markdown('<div class="section-header">🧮 4-Week Holding & Asset Value Simulator</div>', unsafe_allow_html=True)
         st.caption("Calculate expected asset value if you purchase Brent Crude today and hold over a 4-week horizon.")
